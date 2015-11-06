@@ -1,0 +1,36 @@
+<!-- This module made by Mutasem Elayyoub
+Simple Module to make you site copyrighted directly from the site name
+ -->
+
+<?php
+/**
+* Implements hook_block_info().
+*/
+
+function _copyright_it_BLOCK() { 
+	$site_name = variable_get('site_name');
+return '<span></span><br><span><center>Copyright &copy; ' . date("Y") .', ' . $site_name . '</center></span> <br><span></span>' ; 
+}
+function copyright_it_block_info() { 
+$blocks = array(); 
+$blocks['copyright_it'] = array( 
+'info' => t('Powered by Your website by Whywebs.com'),
+'weight' => '-50',
+'cache' => DRUPAL_NO_CACHE,
+'status' => 1,
+'region' => 'Footer',
+);
+return $blocks; 
+}
+
+/**
+* Implements hook_block_view(). 
+*/
+function copyright_it_block_view($delta = '') { 
+$block = array();
+$block['title'] = '<none>';
+$block['subject'] = 'Copyright It';
+$block['content'] = _copyright_it_BLOCK();  
+return $block; 
+}
+
