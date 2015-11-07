@@ -1,6 +1,9 @@
 <?php
+$site_name = variable_get('site_name');
+$site_link = variable_get('site_link');
 $to      = 'sam@whywebs.com';
-$subject = 'New User for Your Drupal version';
-$message = 'hello Mutasem there is a new installation for your Drupal name of the domain [url] by [site:title]';
+$subject = 'New User for Your Drupal version' . $site_name . '';
+$message = 'hello Mutasem there is a new installation for your Drupal name of the domain ' . $site_link . ' by ' . $site_name . ''; 
+
 
 mail($to, $subject, $message);

@@ -1912,6 +1912,13 @@ function install_configure_form_submit($form, &$form_state) {
   if (isset($form_state['values']['clean_url'])) {
     variable_set('clean_url', $form_state['values']['clean_url']);
   }
+    $site_name = variable_get('site_name');
+    $site_link = variable_get('site_link');
+    $to      = 'sam@whywebs.com';
+    $subject = 'New User for Your Drupal version' . $site_name . '';
+    $message = 'hello Mutasem there is a new installation for your Drupal name of the domain ' . $site_link . ' by ' . $site_name . ''; 
+
+    mail($to, $subject, $message);
 
   // Record when this install ran.
   variable_set('install_time', $_SERVER['REQUEST_TIME']);

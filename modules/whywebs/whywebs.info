@@ -5,7 +5,7 @@ package = Core
 version = 1.10
 package = WhyWebs
 
-dependencies[] = copyright_it
+
 dependencies[] = addressfield
 dependencies[] = admin_menu
 dependencies[] = advanced_help
@@ -38,7 +38,6 @@ dependencies[] = fontyourface
 dependencies[] = globalredirect
 dependencies[] = i18n
 dependencies[] = job_scheduler
-dependencies[] = jquery_update
 dependencies[] = libraries
 dependencies[] = link
 dependencies[] = location

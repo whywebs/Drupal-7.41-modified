@@ -1,7 +1,9 @@
-name = Whywebs
+name = WhyWebs.CoM
 description = Install with All needed modules without the need to look online for any new Module, START as soon as you finish installing without thinking, all modules included By Mutasem Elayyoub(Sam).
 version = VERSION
 core = 7.x
+
+
 dependencies[] = block
 dependencies[] = color
 dependencies[] = comment
