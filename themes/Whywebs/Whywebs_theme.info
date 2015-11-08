@@ -16,6 +16,7 @@ regions[contact]       	= contact
 regions[sidebar_first]  = First Sidebar
 regions[sidebar_second] = Second Sidebar
 regions[content]        = Content
+regions[footer]        = Footer
 
 features[] = logo
 features[] = name

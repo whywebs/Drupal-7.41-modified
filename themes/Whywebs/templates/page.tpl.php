@@ -261,9 +261,13 @@ src="//pagead2.googlesyndication.com/pagead/show_ads.js">
         
       <div id="copyright">
 
-        <div class="copyright">
-          <?php print t('Copyright'); ?> &copy; <?php echo date("Y"); ?>, <?php print $site_name; ?>
-        </div> 
+<?php if ($page['footer']): ?>
+
+    <div class="copyright">
+      <?php print render($page['footer']); ?>
+    </div> 
+
+  <?php endif; ?>
 
         <div class="credits">
           <?php print t('Designed by'); ?>  <a href="http://www.Whywebs.com/">Mutasem Elayyoub (Sam)</a>
