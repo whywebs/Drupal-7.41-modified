@@ -15,7 +15,6 @@ along with this program as the file LICENSE.txt; if not, please see
 http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt.
 
 Drupal is a registered trademark of Dries Buytaert.
-This modified Drupal made by Mutasem Elayyoub powered by Whywebs.com.
 
 Drupal includes works under other copyright notices and distributed
 according to the terms of the GNU General Public License or a compatible

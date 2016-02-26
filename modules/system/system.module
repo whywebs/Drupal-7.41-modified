@@ -3056,8 +3056,20 @@ function system_cron() {
     }
   }
 
-  $core = array('cache', 'cache_path', 'cache_filter', 'cache_page', 'cache_form', 'cache_menu');
-  $cache_tables = array_merge(module_invoke_all('flush_caches'), $core);
+  // Delete expired cache entries.
+  // Avoid invoking hook_flush_cashes() on every cron run because some modules
+  // use this hook to perform expensive rebuilding operations (which are only
+  // designed to happen on full cache clears), rather than just returning a
+  // list of cache tables to be cleared.
+  $cache_object = cache_get('system_cache_tables');
+  if (empty($cache_object)) {
+    $core = array('cache', 'cache_path', 'cache_filter', 'cache_page', 'cache_form', 'cache_menu');
+    $cache_tables = array_merge(module_invoke_all('flush_caches'), $core);
+    cache_set('system_cache_tables', $cache_tables);
+  }
+  else {
+    $cache_tables = $cache_object->data;
+  }
   foreach ($cache_tables as $table) {
     cache_clear_all(NULL, $table);
   }
@@ -3407,7 +3419,7 @@ function system_timezone($abbreviation = '', $offset = -1, $is_daylight_saving_t
  * @ingroup themeable
  */
 function theme_system_powered_by() {
-  return '<span>' . t('Powered by <a href="@poweredby">Drupal</a>', array('@poweredby' => 'http://whywebs.com')) . '</span>';
+  return '<span>' . t('Powered by <a href="@poweredby">Drupal</a>', array('@poweredby' => 'https://www.drupal.org')) . '</span>';
 }
 
 /**
