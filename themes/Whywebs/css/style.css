@@ -975,23 +975,29 @@ ol.search-results { padding-left: 0; }
     Social Icons
 ----------------------------*/
 
-.social-media-wrap{
-  margin: 50px 0;
+
+
+.left-float-share:hover .social-media-wrap{
+  margin: 0 0;
   overflow: hidden;
 }
 
-.social-icons{
+.left-float-share:hover .social-icons{
+  width: 100%;
   text-align: center;
 }
-
-.social-icons ul{ margin: 0; }
+.left-float-share:hover .social-icons-name{
+background-image: url('');
+}
+.left-float-share:hover .social-icons ul{ margin: 0;   width: 100%;}
  
-.social-icons li{
+.left-float-share:hover .social-icons li{
+
   display: inline-block;
 }
 
-.social-icons li a {
-  width: 55px;
+.left-float-share:hover .social-icons li a {
+  width: 100% auto;
   color: #777;
   padding: 15px 7px;
   display: block;
@@ -999,13 +1005,33 @@ ol.search-results { padding-left: 0; }
   background: #E7E7E7;
   border-radius: 50%;
   font-size: 27px;
-  height: 55px;
+  height: 20%;
 }
 
-.social-icons li a:hover{
+.left-float-share:hover .social-icons li a:hover{
   background: #fff;
   color: #000;
 }
+.left-float-share:hover #social-media-wrap{
+  margin: 0 0;
+  overflow: hidden;
+}
+
+.left-float-share .social-icons{
+  width: 100%;
+  border-color: white;
+  text-align: center;
+}
+.left-float-share .social-icons-name{
+background-image: url('');
+}
+.left-float-share .social-icons ul{ margin: 0;   width: 100%;}
+ 
+.left-float-share .social-icons li{
+
+  display: block;
+}
+
 
 /*---------------------------
     User Menu
@@ -1423,9 +1449,17 @@ article,
   box-shadow: 2px 2px 0 #E0E0E0;
 }
 
-.not-front #logo img{
+#logo > a img{
+  width: 40%;
+  height: 40%;
+  }
+
+.not-front .logo img{
     box-shadow: 2px 2px 0 #E0E0E0;
   width: 40px;
+  height: 40px;
+  max-width: 60px;
+  max-height: 60px;
 }
 
 .not-front h1#site-title a{
@@ -1441,27 +1475,42 @@ article,
 
 #main-menu ul { display:none; top: 5px; left: 0; }
 
+#main-menu { position: fixed;display: inline-block;}
+
 #main-menu.staticmenu{ 
-  position: fixed;
+  overflow: auto;
+  clear:both;
+  position: relative;
   top: 20px;
   left: 0;
   border: 1px #000;
   bottom: 0;
   background: #000;
   width: 50%;
-  overflow: hidden;
-  z-index: 8;
+  height: 100%;
+  overflow-y: scroll;
+  z-index: 900;
 }
 .staticmenu .menu-navigation-container{
   overflow-y: scroll;
   left: 0;
-  top: 10px;
+  top: 10%;
   border: 1px #000;
-  height: 100%;
+  height: auto;
   margin-left: -18px;
+  display: inline-block;
+}
+#main-menu > div.menu-navigation-container > ul{
+  overflow-y: scroll;
+  left: 0;
+  top: 10%;
+  border: 1px #000;
+  height: auto;
+  text-align: left;
 }
 
-#main-menu li ul { position:static; border: 0; top: 10%;}
+
+#main-menu li ul { position:relative; border: 0; top: 10%;}
 
 #main-menu li ul ul { margin:0 !important; border: 0; top: 10%;}
 
@@ -1474,7 +1523,7 @@ article,
   color: #fff;
   border-radius: 0;
   margin: 0;
-  top: 20px;
+  top: 20%;
   left: 0;
   text-align: center;
   border-bottom: 0;
@@ -1513,7 +1562,7 @@ article,
 .menu_wrapper{ margin: 0; width: 100%;}
 
 #main-menu .nav-toggle {
-  position: absolute;
+  position: relative;
   top: 5%;
   left:  0;
   margin: 0;
@@ -1533,7 +1582,8 @@ article,
 
 #main-menu .nav-toggle.dropdownactive{
   background: url(../images/mobile-menu.png) 17px -15px #18222B no-repeat;
-  position: absolute;
+  position: relative;
+  animation:alternate;
   top: 0;
  z-index: 9;
   left:  0;
