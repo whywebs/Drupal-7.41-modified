@@ -1,0 +1,441 @@
+<?php
+
+/**
+ * Implements hook_node_export_alter().
+ */
+function field_collection_deploy_node_export_alter(&$nodes, $format) {
+
+  $bundles = field_collection_deploy_bundle_fields();
+
+  foreach ($nodes as $node) {
+    // Check if node has Field Collection field.
+    if (isset($bundles[$node->type])) {
+      $node->field_collection_deploy = field_collection_deploy_entity($node, $bundles);
+    }
+  }
+}
+
+/**
+ * Get the field collection entities of a node.
+ */
+function field_collection_deploy_entity(&$node, &$field_collections) {
+  $export = array();
+
+  if(isset($field_collections[$node->type])) {
+    // Cycle through each first-level field collection on this node.
+    foreach ($field_collections[$node->type] as $field_collection => $fields) {
+      $entity_ids = array();
+
+      // Get the entity IDs of each base-level field collection.
+      $field_collection_values = field_view_field('node', $node, $field_collection);
+      foreach ($field_collection_values['#items'] as $delta => $entity_id) {
+        $entity_ids[] = $entity_id['value'];
+      }
+
+      // Analyze each field on any field collections we found.
+      if (!empty($entity_ids)) {
+        $items = entity_load("field_collection_item", $entity_ids);
+        foreach($items as $item) {
+
+          // Wrap our loaded item, and get an array of that entity.
+          $fc_wrapper = entity_metadata_wrapper('field_collection_item', $item);
+
+          // Strip out the object properties from the value() call, in array form.
+          $item_export = get_object_vars($fc_wrapper->value());
+
+          // Examine the current field collection's fields, and build out any children for export.
+          // Add them as a sub array of the base field collection export.
+          $fc_children = field_collection_deploy_export_entity_children($fc_wrapper);
+          $item_export['field_collection_deploy_children'] = $fc_children['child_data'];
+
+          // @todo
+          //   Related issue: 2299001.
+          //   Add support for image export on field collections.
+
+          $export[$field_collection][] = $item_export;
+        }
+      }
+    }
+  }
+  return $export;
+}
+
+
+/**
+ * Recursively traverse the fields on any field collections,
+ * and build out their export data. This includes file support.
+ *
+ * @param EntityMetadataWrapped Entity $wrapped_entity
+ *   The wrapped entity we should search the field of, and assemble export data.
+ * @param  integer $depth
+ *   The current depth of our recursion. Mostly used as a runaway recursion check.
+ *
+ * @return array
+ *   An array with 2 keys:
+ *     'child_data' => The subfields of any field collection, which should be
+ *        attached to the node, or the field collection.
+ *     'image_data' => array(field => field_image_encoded data) => file encoded
+ *        data export, keyed by the field it belongs to.
+ */
+
+function field_collection_deploy_export_entity_children($entity, $depth = 0) {
+
+  // Arbitrary depth limit. Remove, or customize?
+  $depth_limit = 99;
+
+  // If this is not an entity_metadata_wrapper, fail.
+  if(! ($entity instanceof EntityMetadataWrapper)) {
+    Throw new Exception('Child entity was not wrapped when exporting a field collection.');
+  }
+
+  // Get a list of all supported file field types. If we encounter one of these,
+  // we will export them. Otherwise, they will be ignored.
+  $supported_fields = array_map('trim', explode(',', variable_get('node_export_file_supported_fields', 'file, image')));
+
+  $result_data = array(
+    'child_data' => array(),
+    'image_data' => NULL,
+  );
+
+  $entity_id = $entity->getIdentifier();
+
+  // Iterate through each field on this field collection.
+  foreach($entity AS $field_name => $field) {
+
+    // Ignore host_entity fields, or we'll recurse infinitely.
+    if($field_name == 'host_entity') {
+      continue;
+    }
+    // Multi-valued entities need to another layer of recursion.
+    elseif(entity_property_list_extract_type($field->type()) == 'field_collection_item') {
+      $list_result = array();
+      foreach($field AS $field_id => $field_collection_instance) {
+        // Get the entire field collection field list.
+        $my_entity_data = get_object_vars($field_collection_instance->value());
+
+        // Dive deaper, and build an export of any child field collections.
+        $fc_children = field_collection_deploy_export_entity_children($field_collection_instance, ($depth + 1));
+
+        // Only add our child data if we found nested field collections. If
+        // found, append the child field collection to the field list.
+        if(isset($fc_children)) {
+          $my_entity_data['field_collection_deploy_children'] = $fc_children['child_data'];
+        }
+
+        // @todo
+        //   Related issue: 2299001.
+        //   Add support for image export on field collections.
+
+        $list_result[] = $my_entity_data;
+      }
+
+      $result_data['child_data'][$field_name] = $list_result;
+    }
+    // Only process fields which are field collections, and which are not empty.
+    elseif($field->type() == 'field_collection_item' && $depth <= $depth_limit && $field->getIdentifier()) {
+
+      // Get the entire field collection field list.
+      $my_entity_data = get_object_vars($field->value());
+
+      // Dive deaper, and build an export of any child field collections.
+      $fc_children = field_collection_deploy_export_entity_children($field, ($depth + 1));
+
+      // Only add our child data if we found nested field collections. If so,
+      // append the child field collection to the field list.
+      if(isset($fc_children)) {
+        $my_entity_data['field_collection_deploy_children'] = $fc_children['child_data'];
+      }
+
+      // Append file field data.
+      if(isset($fc_children['image_data'])) {
+        field_collection_deploy_export_append_file_data($my_entity_data, $fc_children['image_data']);
+      }
+
+      // Add this field collection to our results..
+      $result_data['child_data'][$field_name][] = $my_entity_data;
+    }
+
+    // @todo
+    //   Related issue: 2299001.
+    //   Add support for image export on field collections.
+
+    elseif($depth > $depth_limit){
+      Throw new Exception('Depth limit exceeded while exporting a field collection structure.');
+    }
+  }
+
+  return $result_data;
+}
+
+
+/**
+ * Manipulate node array before import.
+ *
+ * The purpose of this is to allow a module to check nodes in the array for
+ * two or more nodes that must retain a relationship, and to add/remove other
+ * data to the array to assist with maintaining dependencies, relationships,
+ * references, and additional data required by the nodes.
+ *
+ * @param &$nodes
+ *   The array of nodes to alter.
+ * @param $format
+ *   The format of node code being used.
+ * @param $save
+ *   Whether the nodes will be saved by node_export_import().
+ */
+function field_collection_deploy_node_export_import_alter(&$nodes, $used_format, $save) {
+  foreach ($nodes as $key => $node) {
+    if (isset($node->field_collection_deploy)) {
+      field_collection_deploy_unset_fields($nodes, $key, $node, $node->field_collection_deploy);
+    }
+  }
+}
+
+/**
+ * Unset fields of type field collection, so they can be re-set with correct values later.
+ */
+function field_collection_deploy_unset_fields(&$nodes, $key, $node, $field_collections) {
+  foreach ($field_collections as $field_name => $field) {
+    $node->$field_name = array();
+    $nodes[$key] = $node;
+  }
+}
+
+/**
+ * Manipulate node array after import.
+ *
+ * The purpose of this is to allow a module to check nodes in the array for
+ * two or more nodes that must retain a relationship, and to add/remove other
+ * data to the array to assist with maintaining dependencies, relationships,
+ * references, and additional data required by the nodes.
+ *
+ * @param &$nodes
+ *   The array of nodes to alter - IMPORTANT: keyed by node id.
+ * @param $format
+ *   The format of node code being used.
+ * @param $save
+ *   Whether the nodes were saved by node_export_import().
+ */
+function field_collection_deploy_node_export_after_import_alter(&$nodes, $format, $save) {
+  foreach ($nodes as $key => $node) {
+    if (isset($node->field_collection_deploy)) {
+      field_collection_deploy_import_field_collections($node, $node->field_collection_deploy);
+    }
+  }
+}
+
+/**
+ *  Get list of bundles that have a Field Collection field.
+ *
+ *  Return array [bundle][field collection][fields in field collection].
+ */
+function field_collection_deploy_bundle_fields() {
+  $field_collections = field_info_instances('field_collection_item');
+
+  foreach ($field_collections as $field_name => $info) {
+    $field_info = field_info_field($field_name);
+
+    // Process any field on a node bundle.
+    if(isset($field_info['bundles']['node'])){
+      foreach ($field_info['bundles']['node'] as $bundle) {
+        $bundles[$bundle][$field_name] = $info;
+      }
+    }
+  }
+
+  return $bundles;
+}
+
+
+
+/**
+ * During a Node Export Import process, process each node as it is imported,
+ * and build out any attached field collections or images on a field collection.
+ *
+ * Node_Export does not handle field collections, so this module extends that
+ * function to allow importing of nested field collections and images on a field
+ * collection.
+ *
+ * @param stdClass $node
+ *   The loaded node, which we should attach our new field colelction
+ *   & image data to.
+ * @param array $field_collection_deploy_array
+ *   The array built when exporting field collections as an extension of
+ *   Node Export. This contains all definitions of nested field collections,
+ *   nested field collection images, etc, which we should build out, and append
+ *   to the node.
+ */
+function field_collection_deploy_import_field_collections(&$node, $field_collection_deploy_array) {
+
+  try {
+    // Wrap our node, so we can load data on it.
+    $node_wrapper = entity_metadata_wrapper('node', $node->nid, array($node->type));
+
+    // Process each field collection in our export array, related to this node.
+    foreach($field_collection_deploy_array AS $field_name => $field_collections) {
+
+      // Unset the field in our node, since we'll recreate the associations
+      // by setting this node as our parent entity.
+      $node_wrapper->$field_name->set(NULL);
+
+      // Build out each field collection of type $field_name
+      foreach($field_collections AS $field_collection) {
+        // Attach a field collection to this node.
+        $child_entity = field_collection_deploy_attach_field_collection_item($node_wrapper, $field_collection, $field_name);
+      }
+    }
+
+    // Now save the node
+    $node_wrapper->save(true);
+  }
+  catch(Exception $e) {
+    /**
+       @todo
+         handle exceptions and use a drupal_set_message with the contents of $e->getMessage()
+     */
+  }
+}
+
+
+/**
+ * Recursively build out a field collection tree from a base field collection
+ * on a node.
+ *
+ * @param EntityMetadataWrapper $wrapped_host_entity
+ *   The wrapped host entity this field collection will be associated with.
+ * @param array $field_collection_data
+ *   The data we'll be building our field collection with. May have nested
+ *   field collection data within it. The base level should contain a single
+ *   field collection definition that should be created during this execution of
+ *   this function. Nested data below this will be recursively built out.
+ * @param int $depth
+ *   The current recursive depth of this field collection.
+ *
+ * @return EntityMetadatWrapper
+ *   The wrapped field collection created at this level, with any children
+ *   already built out and associated.
+ */
+function field_collection_deploy_attach_field_collection_item(&$wrapped_host_entity, $field_collection_data, $bundle, $depth=0) {
+
+  // If this is not an entity_metadata_wrapper, fail.
+  if(! ($wrapped_host_entity instanceof EntityMetadataWrapper)) {
+    Throw new Exception('Passed parent entity was not wrapped when importing a field collection.');
+  }
+
+  // For entity reference field: adjust reference to point to new node
+  // before we create the entity.
+  field_collection_deploy_update_entity_reference($bundle, $field_collection_data);
+
+  // Make sure we have field collection definition data,
+  // or our export was malformed.
+  if(isset($field_collection_data)) {
+    $temp_field_coll_data = $field_collection_data;
+  }
+  else {
+    Throw new Exception("Could not find child entity data while loading child field collection.");
+  }
+
+  // Make sure to unset our custom module array from the data we should be saving.
+  if(isset($temp_field_coll_data['field_collection_deploy_children'])) {
+    unset($temp_field_coll_data['field_collection_deploy_children']);
+  }
+
+  $old_id = $field_collection_data['item_id'];
+  $old_rid = $field_collection_data['revision_id'];
+
+  // Unset the revision and entity id. We'll let new values be created,
+  // and the wrappers take care of associating new IDs. They should
+  // float up to the parent automagically.
+  if(isset($temp_field_coll_data['revision_id'])) {
+    unset($temp_field_coll_data['revision_id']);
+  }
+  if(isset($temp_field_coll_data['item_id'])) {
+    unset($temp_field_coll_data['item_id']);
+  }
+
+  // Create our currently selected field collection.
+  $field_collection_item = entity_create('field_collection_item', $temp_field_coll_data);
+
+  // The setHostEntity() needs a raw entity, not a wrapper.
+  $my_host_raw = $wrapped_host_entity->value();
+
+  // Set it's parent.
+  $field_collection_item->setHostEntity($wrapped_host_entity->type(), $my_host_raw);
+
+  // Wrap our newly imported entity.
+  $fc_wrapper = entity_metadata_wrapper('field_collection_item', $field_collection_item);
+
+  // Now save the field collection entity to the database
+  $fc_wrapper->save(true);
+
+  // @todo
+  //   Related issue: 2299001.
+  //   Add support for image export on field collections.
+
+  // If this entity contains references to other field collections,
+  // assemble those recurisvely.
+  foreach($field_collection_data['field_collection_deploy_children'] AS $field_name => $field_instances) {
+
+    // Unset all instances of these fields,
+    // so links with new IDs get created properly after creation.
+    $fc_wrapper->$field_name->set(NULL);
+
+    // Make sure we have the structure for the expected child, or fail.
+    if(!isset($field_collection_data['field_collection_deploy_children'])) {
+      Throw new Exception('Malformed field collection tree while importing this field collection child.');
+    }
+
+    // Process each instance of this field collection type,
+    // and assemble their children.
+    foreach($field_instances AS $field_definition) {
+      field_collection_deploy_attach_field_collection_item($fc_wrapper, $field_definition, $field_name, ($depth + 1));
+    }
+  }
+
+  // In case we have new references, save this entity a second time.
+  $fc_wrapper->save(true);
+
+  // Re-wrap our host entity, and assign back to the referenced variable...
+  $wrapped_host_entity = entity_metadata_wrapper($wrapped_host_entity->type(), $my_host_raw);
+
+  // Finally, return the wrapped entity, in case we need this data.
+  // Note: After recursion completes, the method calling this function
+  // would need this so it can get the identifier and the revision ID,
+  // to update the references.
+  return $fc_wrapper;
+}
+
+
+function field_collection_deploy_update_entity_reference($bundle, &$entity_field) {
+
+  // Get list of fields contained in this entity field.
+  $field_instance = field_info_instances('field_collection_item', $bundle);
+
+  foreach ($field_instance as $field_name => $field_info) {
+    $field_definition = field_info_field($field_name);
+
+    // Check if field is an entity reference.
+    if ($field_definition['type'] == 'entityreference' && !empty($entity_field[$field_name])) {
+
+      // Get just the values of a field and it's language.
+      $field_data = $entity_field[$field_name];
+      // Get data.
+      $field_values = reset($field_data);
+      $language = key($field_data);
+
+      foreach ($field_values as $key => $entity_field_value) {
+        // Get nid from uuid.
+        // Note: New imports use the object format for entities, while older versions exported this as an array.
+        $uuid = $entity_field_value['entity']->uuid;
+        $nids = entity_get_id_by_uuid('node', array($uuid));
+
+        // Update old nid to new nid.
+        if (!empty($nids)) {
+          $entity_field[$field_name][$language][$key]['target_id'] = $nids[$uuid];
+        }
+      }
+    }
+  }
+
+  return;
+}
